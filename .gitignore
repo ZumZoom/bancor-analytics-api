@@ -1,0 +1,16 @@
+# Python
+.cache
+.env
+.tox
+__pycache__
+*.py[co]
+.coverage
+.pytest_cache
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
