@@ -49,8 +49,8 @@ class Roi(Resource, DateParserMixin, TokenExistsMixin):
     def get(self, token):
         self.ensure_token_exists(token)
         start_date, end_date = self.parse_date()
-        roi = list(mongo.db.roi.find({'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
-                                     {'_id': False, 'token': False}))
+        roi = list(mongo.db.history.find({'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
+                                         {'_id': False, 'timestamp': True, 'gm_change': True, 'price': True}))
 
         return {
             'roi': roi
@@ -58,7 +58,7 @@ class Roi(Resource, DateParserMixin, TokenExistsMixin):
 
 
 @namespace.route('/providers/<string:token>')
-class Providers(Resource):
+class Providers(Resource, TokenExistsMixin):
     def get(self, token):
         self.ensure_token_exists(token)
         providers = list(mongo.db.providers.find({'token': token}, {'_id': False, 'token': False}))
@@ -69,13 +69,13 @@ class Providers(Resource):
         }
 
 
-@namespace.route('/total_volume')
-class TotalVolume(Resource, DateParserMixin):
+@namespace.route('/volume')
+class Volume(Resource, DateParserMixin):
     @rest_api.doc(parser=parser)
     def get(self):
         start_date, end_date = self.parse_date()
-        volume = list(mongo.db.roi.find({'timestamp': {'$lte': end_date, '$gte': start_date}},
-                                        {'_id': False, 'gm_change': False, 'price': False}))
+        volume = list(mongo.db.history.find({'timestamp': {'$lte': end_date, '$gte': start_date}, 'volume': {'$gt': 0}},
+                                            {'_id': False, 'token': True, 'volume': True}))
         return {
             'volume': volume
         }
@@ -97,8 +97,8 @@ class Liquidity(Resource, DateParserMixin):
     def get(self):
         start_date, end_date = self.parse_date()
 
-        liquidity = list(mongo.db.liquidity.find({'timestamp': {'$lte': end_date, '$gte': start_date}},
-                                                 {'_id': False}))
+        liquidity = list(mongo.db.history.find({'timestamp': {'$lte': end_date, '$gte': start_date}},
+                                               {'_id': False, 'token': True, 'timestamp': True, 'bnt': True}))
 
         return {
             'liquidity': liquidity
@@ -112,8 +112,8 @@ class LiquidityByToken(Resource, DateParserMixin, TokenExistsMixin):
         self.ensure_token_exists(token)
         start_date, end_date = self.parse_date()
 
-        liquidity = list(mongo.db.liquidity.find({'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
-                                                 {'_id': False}))
+        liquidity = list(mongo.db.history.find({'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
+                                               {'_id': False, 'token': True, 'timestamp': True, 'bnt': True}))
 
         return {
             'liquidity': liquidity
