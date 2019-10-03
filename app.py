@@ -1,3 +1,4 @@
+import os
 import time
 
 from flask import Flask, make_response, jsonify
@@ -7,10 +8,10 @@ from flask_restplus import Api, Resource, abort
 
 flask_app = Flask(__name__)
 cors = CORS(flask_app)
-flask_app.config['MONGO_URI'] = 'mongodb://localhost:27017/bancor'
-mongo = PyMongo(flask_app)
 rest_api = Api(app=flask_app)
 namespace = rest_api.namespace('api/v1', description='Main APIs')
+
+mongo = PyMongo(uri=os.environ['MONGODB_URI'])
 
 SEC_PER_WEEK = 60 * 60 * 24 * 7
 
