@@ -81,6 +81,29 @@ class Volume(Resource, DateParserMixin):
         }
 
 
+@namespace.route('/volume/<string:token>')
+class VolumeByToken(Resource, DateParserMixin, TokenExistsMixin):
+    @rest_api.doc(parser=parser)
+    def get(self, token):
+        self.ensure_token_exists(token)
+        start_date, end_date = self.parse_date()
+        volume = list(mongo.db.history.find(
+            {
+                'timestamp': {'$lte': end_date, '$gte': start_date},
+                'volume': {'$gt': 0},
+                'token': token
+            },
+            {
+                '_id': False,
+                'token': True,
+                'volume': True
+            }
+        ))
+        return {
+            'volume': volume
+        }
+
+
 @namespace.route('/tokens')
 class Tokens(Resource):
     def get(self):
