@@ -11,7 +11,8 @@ cors = CORS(flask_app)
 rest_api = Api(app=flask_app)
 namespace = rest_api.namespace('api/v1', description='Main APIs')
 
-mongo = PyMongo(uri=os.environ['MONGODB_URI'])
+flask_app.config['MONGO_URI'] = os.environ['MONGODB_URI']
+mongo = PyMongo(flask_app)
 
 SEC_PER_WEEK = 60 * 60 * 24 * 7
 
