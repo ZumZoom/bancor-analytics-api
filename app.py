@@ -75,7 +75,7 @@ class Volume(Resource, DateParserMixin):
     def get(self):
         start_date, end_date = self.parse_date()
         volume = list(mongo.db.history.find({'timestamp': {'$lte': end_date, '$gte': start_date}, 'volume': {'$gt': 0}},
-                                            {'_id': False, 'token': True, 'volume': True}))
+                                            {'_id': False, 'token': True, 'volume': True, 'timestamp': True}))
         return {
             'volume': volume
         }
@@ -96,7 +96,8 @@ class VolumeByToken(Resource, DateParserMixin, TokenExistsMixin):
             {
                 '_id': False,
                 'token': True,
-                'volume': True
+                'volume': True,
+                'timestamp': True
             }
         ))
         return {
