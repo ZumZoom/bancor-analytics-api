@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_pymongo import PyMongo
 from flask_restplus import Api, Resource, abort
 
-from config import DAI_CONVERTER_ADDRESS, BNT_ADDRESS, EVENT_CONVERSION, w3, BLOCKS_PER_DAY
+from config import DAI_CONVERTER_ADDRESS, BNT_ADDRESS, EVENT_CONVERSION, w3, BLOCKS_PER_DAY, DAI_ADDRESS
 from contracts import BancorConverter, ERC20
 from utils import get_logs
 
@@ -161,7 +161,7 @@ class InfoByToken(Resource, TokenExistsMixin):
         token_decimals = ERC20(token_address).decimals()
         token_balance = converter.token_balance(token_address)
         token_price_in_bnt = bnt_balance / token_balance / 10 ** (18 - token_decimals)
-        dai_price_in_bnt = dai_converter.price()
+        dai_price_in_bnt = dai_converter.price(DAI_ADDRESS)
         token_price_in_dai = token_price_in_bnt / dai_price_in_bnt
 
         current_block = w3.eth.blockNumber

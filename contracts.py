@@ -24,8 +24,10 @@ class BancorConverter(Contract):
     def token_balance(self, token_address: str) -> int:
         return self.contract.functions.getConnectorBalance(token_address).call()
 
-    def price(self) -> float:
-        return self.token_balance(BNT_ADDRESS) / self.token_balance(self.token_address())
+    def price(self, token_address: str = None) -> float:
+        if not token_address:
+            token_address = self.token_address()
+        return self.token_balance(BNT_ADDRESS) / self.token_balance(token_address)
 
 
 class ERC20(Contract):
