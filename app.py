@@ -6,6 +6,10 @@ from flask_cors import CORS
 from flask_pymongo import PyMongo
 from flask_restplus import Api, Resource, abort
 
+from config import DAI_CONVERTER_ADDRESS, BNT_ADDRESS, EVENT_CONVERSION, w3, BLOCKS_PER_DAY
+from contracts import BancorConverter, ERC20
+from utils import get_logs
+
 flask_app = Flask(__name__)
 cors = CORS(flask_app)
 rest_api = Api(app=flask_app)
@@ -38,9 +42,10 @@ class DateParserMixin:
 
 class TokenExistsMixin:
     def ensure_token_exists(self, token):
-        found = mongo.db.tokens.find_one({'token': token})
+        found = mongo.db.tokens.find_one({'token': token}, {'_id': False})
         if found is None:
             abort(make_response(jsonify({'error': 'Token {} not found'.format(token)}), 404))
+        return found
 
 
 @namespace.route('/roi/<string:token>')
@@ -141,4 +146,39 @@ class LiquidityByToken(Resource, DateParserMixin, TokenExistsMixin):
 
         return {
             'liquidity': liquidity
+        }
+
+
+@namespace.route('/info/<string:token>')
+class InfoByToken(Resource, TokenExistsMixin):
+    def get(self, token):
+        token_info = self.ensure_token_exists(token)
+        converter_addr = token_info['converter']
+        converter = BancorConverter(converter_addr)
+        dai_converter = BancorConverter(DAI_CONVERTER_ADDRESS)
+        bnt_balance = converter.token_balance(BNT_ADDRESS)
+        token_address = converter.token_address()
+        token_decimals = ERC20(token_address).decimals()
+        token_balance = converter.token_balance(token_address)
+        token_price_in_bnt = bnt_balance / token_balance / 10 ** (18 - token_decimals)
+        dai_price_in_bnt = dai_converter.price()
+        token_price_in_dai = token_price_in_bnt / dai_price_in_bnt
+
+        current_block = w3.eth.blockNumber
+        logs = get_logs(converter_addr, [EVENT_CONVERSION], current_block - BLOCKS_PER_DAY, current_block)
+        volume = 0
+        for log in logs:
+            event = converter.parse_event('Conversion', log)
+            if event['args']['_fromToken'] == BNT_ADDRESS:
+                volume += event['args']['_amount']
+            else:
+                volume += event['args']['_return'] + event['args']['_conversionFee']
+
+        return {
+            'bnt_balance': bnt_balance / 10 ** 18,
+            'token_balance': token_balance / 10 ** token_decimals,
+            'token_price_in_bnt': token_price_in_bnt,
+            'token_price_in_usd': token_price_in_dai,
+            '24h_volume_in_bnt': volume / 10 ** 18,
+            '24h_volume_in_usd': volume / 10 ** 18 / dai_price_in_bnt
         }
