@@ -52,10 +52,24 @@ class TokenExistsMixin:
 class Roi(Resource, DateParserMixin, TokenExistsMixin):
     @rest_api.doc(parser=parser)
     def get(self, token):
-        self.ensure_token_exists(token)
+        token_info = self.ensure_token_exists(token)
+        converter_addr = token_info['converter']
+        converter = BancorConverter(converter_addr)
+        token_address = converter.token_address()
+        token_decimals = ERC20(token_address).decimals()
         start_date, end_date = self.parse_date()
         roi = list(mongo.db.history.find({'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
                                          {'_id': False, 'timestamp': True, 'gm_change': True, 'price': True}))
+
+        dai_prices = list(mongo.db.history.find(
+            {'token': 'daibnt', 'timestamp': {'$lte': end_date, '$gte': start_date}},
+            {'_id': False, 'timestamp': True, 'price': True}
+        ))
+
+        for token_stat, dai_stat in zip(roi, dai_prices):
+            token_stat['token_price_in_bnt'] = 1 / token_stat['price'] / 10 ** (18 - token_decimals)
+            token_stat['token_price_in_usd'] = token_stat['token_price_in_bnt'] * dai_stat['price']
+            del token_stat['price']
 
         return {
             'roi': roi
