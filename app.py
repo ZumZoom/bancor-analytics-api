@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_pymongo import PyMongo
 from flask_restplus import Api, Resource, abort
 
-from config import DAI_CONVERTER_ADDRESS, BNT_ADDRESS, EVENT_CONVERSION, w3, BLOCKS_PER_DAY, DAI_ADDRESS
+from config import DAI_CONVERTER_ADDRESS, BNT_ADDRESS, EVENT_CONVERSION, w3, BLOCKS_PER_DAY, DAI_ADDRESS, USDB_ADDRESS
 from contracts import BancorConverter, ERC20
 from utils import get_logs
 
@@ -67,8 +67,8 @@ class Roi(Resource, DateParserMixin, TokenExistsMixin):
         ))
 
         for token_stat, dai_stat in zip(roi, dai_prices):
-            token_stat['token_price_in_bnt'] = 1 / token_stat['price'] / 10 ** (18 - token_decimals)
-            token_stat['token_price_in_usd'] = token_stat['token_price_in_bnt'] * dai_stat['price']
+            token_stat['token_price_in_base_token'] = 1 / token_stat['price'] / 10 ** (18 - token_decimals)
+            token_stat['token_price_in_usd'] = token_stat['token_price_in_base_token'] * dai_stat['price']
             del token_stat['price']
 
         return {
@@ -84,7 +84,7 @@ class Providers(Resource, TokenExistsMixin):
 
         return {
             'providers': providers,
-            'total': sum(p['bnt'] for p in providers)
+            'total': sum(p['base_token_balance'] for p in providers)
         }
 
 
@@ -93,8 +93,10 @@ class Volume(Resource, DateParserMixin):
     @rest_api.doc(parser=parser)
     def get(self):
         start_date, end_date = self.parse_date()
-        volume = list(mongo.db.history.find({'timestamp': {'$lte': end_date, '$gte': start_date}, 'volume': {'$gt': 0}},
-                                            {'_id': False, 'token': True, 'volume': True, 'timestamp': True}))
+        volume = list(mongo.db.history.find(
+            {'timestamp': {'$lte': end_date, '$gte': start_date}, 'volume': {'$gt': 0}},
+            {'_id': False, 'token': True, 'volume': True, 'timestamp': True}
+        ))
         return {
             'volume': volume
         }
@@ -140,8 +142,10 @@ class Liquidity(Resource, DateParserMixin):
     def get(self):
         start_date, end_date = self.parse_date()
 
-        liquidity = list(mongo.db.history.find({'timestamp': {'$lte': end_date, '$gte': start_date}},
-                                               {'_id': False, 'token': True, 'timestamp': True, 'bnt': True}))
+        liquidity = list(mongo.db.history.find(
+            {'timestamp': {'$lte': end_date, '$gte': start_date}},
+            {'_id': False, 'token': True, 'timestamp': True, 'base_token_balance': True}
+        ))
 
         return {
             'liquidity': liquidity
@@ -155,8 +159,10 @@ class LiquidityByToken(Resource, DateParserMixin, TokenExistsMixin):
         self.ensure_token_exists(token)
         start_date, end_date = self.parse_date()
 
-        liquidity = list(mongo.db.history.find({'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
-                                               {'_id': False, 'token': True, 'timestamp': True, 'bnt': True}))
+        liquidity = list(mongo.db.history.find(
+            {'token': token, 'timestamp': {'$lte': end_date, '$gte': start_date}},
+            {'_id': False, 'token': True, 'timestamp': True, 'base_token_balance': True}
+        ))
 
         return {
             'liquidity': liquidity
@@ -170,7 +176,7 @@ class InfoByToken(Resource, TokenExistsMixin):
         converter_addr = token_info['converter']
         converter = BancorConverter(converter_addr)
         dai_converter = BancorConverter(DAI_CONVERTER_ADDRESS)
-        bnt_balance = converter.token_balance(BNT_ADDRESS)
+        bnt_balance = converter.token_balance(BNT_ADDRESS if token_info['base_token'] == 'bnt' else USDB_ADDRESS)
         token_address = converter.token_address()
         token_decimals = ERC20(token_address).decimals()
         token_balance = converter.token_balance(token_address)
@@ -189,10 +195,10 @@ class InfoByToken(Resource, TokenExistsMixin):
                 volume += event['args']['_return'] + event['args']['_conversionFee']
 
         return {
-            'bnt_balance': bnt_balance / 10 ** 18,
+            'base_token_balance': bnt_balance / 10 ** 18,
             'token_balance': token_balance / 10 ** token_decimals,
-            'token_price_in_bnt': token_price_in_bnt,
+            'token_price_in_base_token': token_price_in_bnt,
             'token_price_in_usd': token_price_in_dai,
-            '24h_volume_in_bnt': volume / 10 ** 18,
+            '24h_volume_in_base_token': volume / 10 ** 18,
             '24h_volume_in_usd': volume / 10 ** 18 / dai_price_in_bnt
         }
